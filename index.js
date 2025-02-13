@@ -30,8 +30,17 @@ function mainMenu() {
             if (response.menu === "view all departments") {
                 viewDepartments()
             }
+            else if (response.menu === "view all roles") {
+                viewRoles()
+            }
             else if (response.menu === "view all employees") {
                 viewEmployees()
+            }
+            else if (response.menu === "add a department") {
+                addDepartment()
+            }
+            else if (response.menu === "add a role") {
+                addRole()
             }
             else if (response.menu === "add an employee") {
                 addEmployee()
@@ -122,5 +131,85 @@ function viewDepartments() {
     pool.query("SELECT * FROM department", (err, { rows }) => {
         printTable(rows)
         mainMenu()
+    })
+}
+
+function viewRoles() {
+    pool.query(`
+        SELECT role.id, role.title, department.name as department, role.salary 
+        FROM role
+        LEFT JOIN department ON department.id = role.department_id
+        ORDER BY role.id`,
+        (err, { rows }) => {
+            if (err) {
+                console.error('Error viewing roles:', err);
+                return mainMenu();
+            }
+            printTable(rows)
+            mainMenu()
+        })
+}
+
+function addDepartment() {
+    inquirer.prompt([
+        {
+            type: "input",
+            message: "What is the name of the department?",
+            name: "name"
+        }
+    ])
+        .then(res => {
+            pool.query('INSERT INTO department (name) VALUES ($1)',
+                [res.name],
+                (err) => {
+                    if (err) {
+                        console.error('Error adding department:', err);
+                        return mainMenu();
+                    }
+                    console.log("New department has been added!")
+                    viewDepartments()
+                })
+        })
+}
+
+function addRole() {
+    pool.query("SELECT name, id as value FROM department", (err, { rows }) => {
+        if (err) {
+            console.error('Error fetching departments:', err);
+            return mainMenu();
+        }
+
+        inquirer.prompt([
+            {
+                type: "input",
+                message: "What is the name of the role?",
+                name: "title"
+            },
+            {
+                type: "input",
+                message: "What is the salary for this role?",
+                name: "salary",
+                validate: input => !isNaN(input) || "Please enter a valid number"
+            },
+            {
+                type: "list",
+                message: "Which department does this role belong to?",
+                name: "department_id",
+                choices: rows
+            }
+        ])
+            .then(res => {
+                pool.query(
+                    'INSERT INTO role (title, salary, department_id) VALUES ($1, $2, $3)',
+                    [res.title, res.salary, res.department_id],
+                    (err) => {
+                        if (err) {
+                            console.error('Error adding role:', err);
+                            return mainMenu();
+                        }
+                        console.log("New role has been added!")
+                        viewRoles()
+                    })
+            })
     })
 }
